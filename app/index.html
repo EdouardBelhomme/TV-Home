@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Accueil</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="grain"></div>
+  </div>
+
+  <main class="home">
+    <header class="hero">
+      <p class="greeting" id="greeting">Bonsoir</p>
+      <h1 class="clock" id="clock">--:--</h1>
+      <p class="date" id="date"></p>
+    </header>
+
+    <section class="shelf" id="shelves"></section>
+  </main>
+
+  <footer class="hints" id="hints">
+    <span><i class="dot yellow"></i>Réorganiser</span>
+    <span><i class="dot blue"></i>Changer d'ambiance</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="apps.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
