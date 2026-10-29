@@ -6,6 +6,7 @@
   var STORE_KEY = 'tv-home:v1';
   var TV_API = 'http://127.0.0.1:8001/api/v2/applications/';
   var TIZENBREW_WS = 'ws://127.0.0.1:8081';
+  var TIZENBREW_APP_ID = 'xvvl3S1bvH.TizenBrewStandalone';
 
   var DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   var MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -185,7 +186,7 @@
   var tizenApps = null;
   function loadTizenApps() {
     var api = window.tizen && window.tizen.application;
-    log('page: ' + location.href);
+    log('page: ' + location.href + (window.TV_HOME_SOURCE ? ' (version ' + window.TV_HOME_SOURCE + ')' : ''));
     log('tizen API: ' + (api ? 'disponible' : 'absente'));
     if (!api) return;
     try {
@@ -258,9 +259,14 @@
     try { xhr.send(); } catch (e) { log('  rest exception: ' + e.message); }
   }
 
-  // Asks TizenBrew's local service for its modules, then launches the matching one the same way TizenBrew's own UI does.
+  // Inside TizenBrew: asks its local service for the module and launches it the way TizenBrew's own UI does.
+  // In the installed app: opens TizenBrew itself (set TizenTube as its auto-launch module to land on YouTube).
   function launchModule(app) {
     toast('Ouverture de ' + app.name + ' ' + (app.sub || '') + '…');
+    if (location.port !== '8081') {
+      log('lancement TizenBrew (' + TIZENBREW_APP_ID + ')');
+      return launchWithTizen({ name: 'TizenBrew', id: TIZENBREW_APP_ID }, function () { toast('TizenBrew introuvable'); });
+    }
     var done = false;
     var ws;
     try { ws = new WebSocket(TIZENBREW_WS); } catch (e) { return toast('TizenBrew est injoignable'); }

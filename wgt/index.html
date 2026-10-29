@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Accueil</title>
+  <style>html, body { margin: 0; width: 1920px; height: 1080px; background: #07080d; }</style>
+</head>
+<body>
+  <script>
+    // Shell installed once on the TV: it pulls the home screen from GitHub at every start,
+    // so a push to the repository updates the TV without reinstalling. If GitHub can't be
+    // reached it falls back to the copy bundled in this package (app/).
+    (function () {
+      var REMOTE = 'https://raw.githubusercontent.com/EdouardBelhomme/TV-Home/main/app/';
+      var LOCAL = 'app/';
+      var FILES = ['index.html', 'style.css', 'apps.js', 'app.js'];
+
+      function get(url, done) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.timeout = 5000;
+        xhr.onload = function () { done(xhr.status === 200 || (xhr.status === 0 && xhr.responseText) ? xhr.responseText : null); };
+        xhr.onerror = xhr.ontimeout = function () { done(null); };
+        xhr.send();
+      }
+
+      function loadAll(base, bust, done) {
+        var out = {}, left = FILES.length, failed = false;
+        FILES.forEach(function (f) {
+          get(base + f + (bust ? '?t=' + Date.now() : ''), function (text) {
+            if (text === null) failed = true;
+            out[f] = text;
+            if (--left === 0) done(failed ? null : out);
+          });
+        });
+      }
+
+      function start(files, source) {
+        window.TV_HOME_SOURCE = source;
+        var style = document.createElement('style');
+        style.textContent = files['style.css'];
+        document.head.appendChild(style);
+        var doc = new DOMParser().parseFromString(files['index.html'], 'text/html');
+        Array.prototype.forEach.call(doc.body.querySelectorAll('script'), function (s) { s.parentNode.removeChild(s); });
+        document.body.innerHTML = doc.body.innerHTML;
+        ['apps.js', 'app.js'].forEach(function (f) {
+          var s = document.createElement('script');
+          s.textContent = files[f];
+          document.body.appendChild(s);
+        });
+      }
+
+      loadAll(REMOTE, true, function (remote) {
+        if (remote) return start(remote, 'github');
+        loadAll(LOCAL, false, function (local) { start(local, 'local'); });
+      });
+    })();
+  </script>
+</body>
+</html>
