@@ -2,9 +2,9 @@
 
 Écran d'accueil épuré pour TV Samsung (Tizen), installé comme une vraie appli (`.wgt`).
 
-- Grande horloge, date et salutation selon l'heure
+- Horloge et date discrètes
 - Photo plein écran (6 au choix) et dock sobre avec les logos des applis, dans l'esprit de [CleanFrame](https://github.com/nthnclrk/CleanFrame)
-- Tuiles d'applis pilotables à la télécommande, dont YouTube sans pub via TizenBrew / TizenTube
+- Applis pilotables à la télécommande, dont YouTube sans pub via TizenBrew / TizenTube
 
 ## Comment ça marche
 
