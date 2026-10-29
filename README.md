@@ -1,4 +1,4 @@
-# tv-home
+# TV-Home
 
 Écran d'accueil épuré pour TV Samsung (Tizen), sous forme de module [TizenBrew](https://github.com/reisxd/TizenBrew).
 
@@ -11,7 +11,7 @@
 Dans TizenBrew, ouvre le gestionnaire de modules, ajoute un module **GitHub** et saisis :
 
 ```
-EdouardBelhomme/tv-home
+EdouardBelhomme/TV-Home
 ```
 
 Pour l'ouvrir automatiquement au lancement de TizenBrew, active le lancement automatique sur le module.
