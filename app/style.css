@@ -162,6 +162,7 @@ body.sheet-open .clock-block, body.sheet-open .dock, body.sheet-open .topbar { o
 .cell .cell-logo { height: 96px; display: flex; align-items: center; }
 .cell .cell-logo img { width: auto; height: 56px; max-width: 150px; border-radius: 0; }
 .cell .wordmark { font-size: 30px; font-weight: 600; }
+.cell .cell-logo img.tv-icon { width: 104px; height: 104px; max-width: none; border-radius: 22px; }
 .cell .name { margin-top: 16px; font-size: 22px; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
 
 .options { position: absolute; left: 120px; top: 230px; width: 560px; }

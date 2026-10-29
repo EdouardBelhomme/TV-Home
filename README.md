@@ -58,3 +58,15 @@ python3 -m http.server 4795
 
 Ouvre ensuite `http://localhost:4795/app/index.html` dans une fenêtre de 1920×1080. Les touches
 `y`, `b` et `r` remplacent le jaune, le bleu et le rouge.
+
+## Liste « Toutes les applis »
+
+[`app/installed.js`](app/installed.js) reprend la liste d'applis de la TV (celle de Smart Hub, pas
+les ~230 services système que voit l'API Tizen). Après avoir installé ou supprimé une appli,
+régénère-la (IP du PC hôte = l'ordinateur), puis pousse sur `main` :
+
+```
+python3 -I tools/sync_installed.py <IP de la TV>
+```
+
+Les icônes sont lues sur la TV elle-même ; elles ne sont pas publiées dans ce dépôt.
