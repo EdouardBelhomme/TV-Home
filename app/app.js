@@ -7,9 +7,7 @@
   var TV_API = 'http://127.0.0.1:8001/api/v2/applications/';
   var TIZENBREW_WS = 'ws://127.0.0.1:8081';
   var TIZENBREW_APP_ID = 'xvvl3S1bvH.TizenBrewStandalone';
-  // Samsung system components, tried in order (the first that launches wins).
-  var TV_SETTINGS_IDS = ['com.samsung.tv.coba.setting', 'org.tizen.menu', 'com.samsung.tv.csfs'];
-  var SAMSUNG_HOME_ID = 'com.samsung.tv.csfs';
+  var SAMSUNG_HOME_ID = 'com.samsung.tv.csfs'; // Smart Hub; from there, all TV settings
 
   // Images and logos: from jsDelivr when the installed app loaded the code from GitHub (raw.githubusercontent
   // serves SVG as text/plain), from the bundled copy when offline, relative otherwise (browser, TizenBrew).
@@ -133,7 +131,6 @@
     if (type === 'wallpaper') sheet = { type: type, sel: state.wallpaper % WALLPAPERS.length };
     else if (type === 'apps') sheet = { type: type, sel: 0, items: allApps() };
     else sheet = { type: type, sel: 0, items: [
-      { id: 'tvsettings', label: 'Réglages de la TV' },
       { id: 'samsunghome', label: 'Accueil Samsung' },
       { id: 'edit', label: 'Réorganiser le dock' },
       { id: 'diag', label: 'Diagnostic' },
@@ -248,7 +245,6 @@
         sheet = null;
         if (choice === 'edit') { zone = 'dock'; toggleEditing(); }
         else if (choice === 'diag') toggleDiag();
-        else if (choice === 'tvsettings') launchFirst('Réglages de la TV', TV_SETTINGS_IDS);
         else if (choice === 'samsunghome') launchFirst('Accueil Samsung', [SAMSUNG_HOME_ID]);
       }
       return;
