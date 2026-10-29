@@ -100,7 +100,7 @@ html, body {
 /* Edit mode */
 body.editing .tile { animation: wiggle 0.5s ease-in-out infinite alternate; }
 body.editing .tile.focused { animation: none; box-shadow: 0 0 0 5px #ffd23f, 0 24px 60px rgba(0, 0, 0, 0.55); }
-body.editing .tile.hidden-app { opacity: 0.3; }
+body.editing .tile.hidden-app { opacity: 0.5; }
 body:not(.editing) .tile.hidden-app { display: none; }
 @keyframes wiggle { from { transform: rotate(-0.6deg); } to { transform: rotate(0.6deg); } }
 
@@ -144,3 +144,20 @@ body:not(.editing) .tile.hidden-app { display: none; }
   z-index: 10;
 }
 .diag.show { display: block; }
+
+/* Edit mode: tile menu, moving state, hidden badge */
+body.editing .tile.moving { animation: none; transform: scale(1.14) translateY(-12px); box-shadow: 0 0 0 5px #ffd23f, 0 30px 70px rgba(0, 0, 0, 0.6); }
+.badge {
+  position: absolute; top: 16px; right: 16px; z-index: 1;
+  padding: 4px 12px; border-radius: 14px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 18px;
+}
+.tile-menu {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 3;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 10px 18px;
+  background: rgba(10, 10, 16, 0.92);
+}
+.tile-menu .item { font-size: 26px; padding: 6px 14px; border-radius: 12px; color: var(--muted); }
+.tile-menu .item.sel { background: #fff; color: #111; }

@@ -21,7 +21,7 @@ Pour l'ouvrir automatiquement au lancement de TizenBrew, active le lancement aut
 | Touche | Action |
 | --- | --- |
 | Flèches / OK | Naviguer / ouvrir l'appli |
-| Jaune | Réorganiser (◀ ▶ pour déplacer, OK pour masquer) |
+| Jaune | Réorganiser : OK sur une tuile pour la déplacer, la masquer ou la réafficher |
 | Bleu | Changer d'ambiance |
 
 ## Modifier les applis

@@ -23,6 +23,9 @@
 
   var state = load();
   var editing = false;
+  var menu = null;     // edit-mode tile menu: { sel, options }
+  var moving = false;  // edit mode: the focused tile follows ◀ ▶
+  var MENU_LABELS = { move: 'Déplacer', hide: 'Masquer', show: 'Afficher', cancel: 'Annuler' };
   var focus = { row: 0, col: 0 };
   var shelves = buildShelves();
   var TILE_STEP = 300 + 28; // --tile-w + --gap
@@ -87,6 +90,20 @@
         t.querySelector('.mark').textContent = app.mark;
         t.querySelector('.name').textContent = app.name;
         if (app.sub) t.querySelector('.sub').textContent = app.sub;
+        if (state.hidden[appKey(app)]) t.insertAdjacentHTML('beforeend', '<div class="badge">Masquée</div>');
+        var isFocused = r === focus.row && c === focus.col;
+        if (isFocused && moving) t.classList.add('moving');
+        if (isFocused && menu) {
+          var m = document.createElement('div');
+          m.className = 'tile-menu';
+          menu.options.forEach(function (opt, i) {
+            var item = document.createElement('div');
+            item.className = 'item' + (i === menu.sel ? ' sel' : '');
+            item.textContent = MENU_LABELS[opt];
+            m.appendChild(item);
+          });
+          t.appendChild(m);
+        }
         tiles.appendChild(t);
       });
       row.appendChild(title);
@@ -95,7 +112,9 @@
     });
     document.body.classList.toggle('editing', editing);
     document.getElementById('hints').innerHTML = editing
-      ? '<span>◀ ▶ Déplacer</span><span>OK Masquer / afficher</span><span><i class="dot yellow"></i>Terminer</span>'
+      ? (moving
+        ? '<span>◀ ▶ Déplacer la tuile</span><span>OK Poser</span>'
+        : '<span>OK Options de la tuile</span><span>Retour ou <i class="dot yellow"></i>Terminer</span>')
       : '<span><i class="dot red"></i>Diagnostic</span><span><i class="dot yellow"></i>Réorganiser</span><span><i class="dot blue"></i>Changer d\'ambiance</span>';
   }
 
@@ -265,6 +284,21 @@
   }
 
   // ---------- Editing ----------
+  // In edit mode the arrows move the focus; OK opens a small menu on the tile (move / hide / cancel).
+  // While moving, ◀ ▶ carry the tile and OK or Back drops it.
+  function openMenu() {
+    var app = visibleApps(focus.row)[focus.col];
+    if (!app) return;
+    menu = { sel: 0, options: ['move', state.hidden[appKey(app)] ? 'show' : 'hide', 'cancel'] };
+  }
+  function applyMenu() {
+    var app = visibleApps(focus.row)[focus.col];
+    var choice = menu.options[menu.sel];
+    menu = null;
+    if (choice === 'move') moving = true;
+    else if (choice === 'hide') state.hidden[appKey(app)] = true;
+    else if (choice === 'show') delete state.hidden[appKey(app)];
+  }
   function moveTile(dir) {
     var apps = shelves[focus.row].apps; // editing shows every app, so visible index == array index
     var to = focus.col + dir;
@@ -279,6 +313,8 @@
       shelves.forEach(function (s, r) { state.order[r] = s.apps.map(appKey); });
       save();
       editing = false;
+      menu = null;
+      moving = false;
       clampFocus();
       toast('Accueil enregistré');
     } else {
@@ -297,25 +333,33 @@
     if (k === 66) k = KEY.BLUE;
     if (k === 82) k = KEY.RED;
     var handled = true;
-    switch (k) {
-      case KEY.LEFT: editing ? moveTile(-1) : focus.col--; break;
-      case KEY.RIGHT: editing ? moveTile(1) : focus.col++; break;
-      case KEY.UP: focus.row--; break;
-      case KEY.DOWN: focus.row++; break;
-      case KEY.ENTER: {
-        var app = visibleApps(focus.row)[focus.col];
-        if (!app) break;
-        if (editing) {
-          var key = appKey(app);
-          if (state.hidden[key]) delete state.hidden[key]; else state.hidden[key] = true;
-        } else launch(app);
-        break;
+    if (editing && moving) {
+      if (k === KEY.LEFT) moveTile(-1);
+      else if (k === KEY.RIGHT) moveTile(1);
+      else if (k === KEY.ENTER || k === KEY.BACK || k === KEY.YELLOW) moving = false;
+    } else if (editing && menu) {
+      if (k === KEY.UP) menu.sel = Math.max(0, menu.sel - 1);
+      else if (k === KEY.DOWN) menu.sel = Math.min(menu.options.length - 1, menu.sel + 1);
+      else if (k === KEY.ENTER) applyMenu();
+      else if (k === KEY.BACK || k === KEY.YELLOW) menu = null;
+    } else {
+      switch (k) {
+        case KEY.LEFT: focus.col--; break;
+        case KEY.RIGHT: focus.col++; break;
+        case KEY.UP: focus.row--; break;
+        case KEY.DOWN: focus.row++; break;
+        case KEY.ENTER: {
+          if (editing) { openMenu(); break; }
+          var app = visibleApps(focus.row)[focus.col];
+          if (app) launch(app);
+          break;
+        }
+        case KEY.YELLOW: toggleEditing(); return e.preventDefault();
+        case KEY.BLUE: nextMood(); break;
+        case KEY.RED: toggleDiag(); return e.preventDefault();
+        case KEY.BACK: if (editing) { toggleEditing(); return e.preventDefault(); } handled = false; break;
+        default: handled = false;
       }
-      case KEY.YELLOW: toggleEditing(); return e.preventDefault();
-      case KEY.BLUE: nextMood(); break;
-      case KEY.RED: toggleDiag(); return e.preventDefault();
-      case KEY.BACK: if (editing) { toggleEditing(); return e.preventDefault(); } handled = false; break;
-      default: handled = false;
     }
     if (!handled) return;
     e.preventDefault();
