@@ -13,6 +13,15 @@
   var ASSETS = (window.TV_HOME_SOURCE === 'github' ? 'https://cdn.jsdelivr.net/gh/EdouardBelhomme/TV-Home@main/app/'
     : window.TV_HOME_SOURCE === 'local' ? 'app/' : '') + 'assets/';
   var WALLPAPERS = ['misty', 'cove', 'forest', 'valley', 'night', 'peaks'];
+  var WALLPAPER_CREDITS = ['Ganapathy Kumar', 'Joshua Wordel', 'Dejan Zakic', 'Aniket Deole', 'Mohammad Alizade', 'John Rodenn Castillo'];
+
+  var ICON_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="#f7f5f0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+  var TOP_BUTTONS = [
+    { id: 'wallpaper', label: 'Fond d\'écran', svg: '<svg ' + ICON_ATTRS + '><rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17.5l5-5 3.5 3.5 2.5-2.5 5 5"/></svg>' },
+    { id: 'apps', label: 'Toutes les applis', svg: '<svg ' + ICON_ATTRS + '><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg>' },
+    { id: 'settings', label: 'Réglages', svg: '<svg ' + ICON_ATTRS + '><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>' }
+  ];
+  var GRID_COLS = 6;
 
   var DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   var MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -23,6 +32,9 @@
   var menu = null;     // edit-mode menu: { sel, options }
   var moving = false;  // edit mode: the focused app follows ◀ ▶
   var focus = { row: 0, col: 0 }; // row = group in HOME_SHELVES
+  var zone = 'dock';   // 'dock' or 'top' (the buttons at the top right)
+  var topIndex = 0;
+  var sheet = null;    // open panel: { type: 'wallpaper' | 'apps' | 'settings', sel, items }
   var shelves = buildShelves();
 
   // ---------- Persistence (localStorage can be unavailable) ----------
@@ -95,13 +107,122 @@
       if (!apps.length) return;
       var group = el('div', 'group');
       group.appendChild(el('div', 'group-title', shelf.title));
-      apps.forEach(function (app, c) { group.appendChild(renderItem(app, r === focus.row && c === focus.col)); });
+      apps.forEach(function (app, c) { group.appendChild(renderItem(app, zone === 'dock' && r === focus.row && c === focus.col)); });
       dock.appendChild(group);
     });
+    var top = document.getElementById('topbar');
+    top.innerHTML = '';
+    TOP_BUTTONS.forEach(function (b, i) {
+      var btn = el('div', 'top-btn' + (zone === 'top' && i === topIndex ? ' focused' : ''));
+      btn.innerHTML = b.svg;
+      btn.appendChild(el('div', 'label', b.label));
+      top.appendChild(btn);
+    });
     document.body.classList.toggle('editing', editing);
-    document.getElementById('hints').innerHTML = editing
-      ? (moving ? '<span>◀ ▶ Déplacer</span><span>OK Poser</span>' : '<span>OK Options</span><span>Retour Terminer</span>')
-      : '<span>Fond d\'écran<i class="dot blue"></i></span><span>Réorganiser<i class="dot yellow"></i></span>';
+    document.getElementById('hints').innerHTML = !editing ? ''
+      : moving ? '<span>◀ ▶ Déplacer</span><span>OK Poser</span>'
+        : '<span>Réorganiser le dock</span><span>OK Options de l\'appli</span><span>Retour Terminer</span>';
+    renderSheet();
+  }
+
+  // ---------- Sheets: wallpaper picker, all apps, settings ----------
+  function openSheet(type) {
+    if (type === 'wallpaper') sheet = { type: type, sel: state.wallpaper % WALLPAPERS.length };
+    else if (type === 'apps') sheet = { type: type, sel: 0, items: allApps() };
+    else sheet = { type: type, sel: 0, items: [{ id: 'edit', label: 'Réorganiser le dock' }, { id: 'diag', label: 'Diagnostic' }, { id: 'close', label: 'Fermer' }] };
+  }
+
+  // Every launchable app installed on the TV (with its real icon); outside the TV, the dock apps.
+  function allApps() {
+    if (tizenApps) {
+      return tizenApps
+        .filter(function (i) { return i.show && i.name && i.id !== 'TVHomeEdou.Accueil'; })
+        .sort(function (a, b) { return a.name.localeCompare(b.name, 'fr'); })
+        .map(function (i) { return { name: i.name, id: i.id, iconPath: i.iconPath }; });
+    }
+    var list = [];
+    shelves.forEach(function (s) { s.apps.forEach(function (a) { list.push(a); }); });
+    return list;
+  }
+
+  function iconUrl(path) {
+    if (!path) return '';
+    return path.charAt(0) === '/' ? 'file://' + path : path;
+  }
+
+  function renderSheet() {
+    var host = document.getElementById('sheet');
+    host.classList.toggle('show', !!sheet);
+    document.body.classList.toggle('sheet-open', !!sheet);
+    host.innerHTML = '';
+    if (!sheet) return;
+    if (sheet.type === 'wallpaper') {
+      host.appendChild(el('div', 'sheet-title', 'Fond d\'écran'));
+      host.appendChild(el('div', 'sheet-sub', 'Photo : ' + WALLPAPER_CREDITS[sheet.sel] + ' sur Unsplash'));
+      var row = el('div', 'thumbs');
+      WALLPAPERS.forEach(function (w, i) {
+        var t = el('div', 'thumb' + (i === sheet.sel ? ' focused' : '') + (i === state.wallpaper % WALLPAPERS.length ? ' current' : ''));
+        t.style.backgroundImage = 'url("' + ASSETS + 'wallpapers/' + w + '-thumb.jpg")';
+        row.appendChild(t);
+      });
+      host.appendChild(row);
+    } else if (sheet.type === 'apps') {
+      host.appendChild(el('div', 'sheet-title', 'Toutes les applis'));
+      host.appendChild(el('div', 'sheet-sub', sheet.items.length + ' applis installées'));
+      var grid = el('div', 'grid');
+      var inner = el('div', 'grid-inner');
+      var firstRow = Math.max(0, Math.floor(sheet.sel / GRID_COLS) - 2); // keep the focused row on screen
+      inner.style.transform = 'translateY(' + (-firstRow * 220) + 'px)';
+      sheet.items.forEach(function (a, i) {
+        var cell = el('div', 'cell' + (i === sheet.sel ? ' focused' : ''));
+        if (a.iconPath) {
+          var img = document.createElement('img');
+          img.src = iconUrl(a.iconPath);
+          cell.appendChild(img);
+        } else {
+          var logo = el('div', 'cell-logo');
+          if (a.icon) { var li = document.createElement('img'); li.src = ASSETS + 'icons/' + a.icon; logo.appendChild(li); } else logo.appendChild(el('span', 'wordmark', a.mark || a.name));
+          cell.appendChild(logo);
+        }
+        cell.appendChild(el('div', 'name', a.name + (a.sub ? ' ' + a.sub.toLowerCase() : '')));
+        inner.appendChild(cell);
+      });
+      grid.appendChild(inner);
+      host.appendChild(grid);
+    } else {
+      host.appendChild(el('div', 'sheet-title', 'Réglages'));
+      var opts = el('div', 'options');
+      sheet.items.forEach(function (o, i) { opts.appendChild(el('div', 'option' + (i === sheet.sel ? ' focused' : ''), o.label)); });
+      host.appendChild(opts);
+    }
+  }
+
+  function sheetKey(k) {
+    var n = sheet.type === 'wallpaper' ? WALLPAPERS.length : sheet.items.length;
+    if (k === KEY.BACK) { sheet = null; return; }
+    if (sheet.type === 'settings') {
+      if (k === KEY.UP) sheet.sel = Math.max(0, sheet.sel - 1);
+      else if (k === KEY.DOWN) sheet.sel = Math.min(n - 1, sheet.sel + 1);
+      else if (k === KEY.ENTER) {
+        var choice = sheet.items[sheet.sel].id;
+        sheet = null;
+        if (choice === 'edit') { zone = 'dock'; toggleEditing(); } else if (choice === 'diag') toggleDiag();
+      }
+      return;
+    }
+    var cols = sheet.type === 'apps' ? GRID_COLS : n;
+    if (k === KEY.LEFT && sheet.sel % cols > 0) sheet.sel--;
+    else if (k === KEY.RIGHT && sheet.sel % cols < cols - 1 && sheet.sel < n - 1) sheet.sel++;
+    else if (k === KEY.UP && sheet.sel - cols >= 0) sheet.sel -= cols;
+    else if (k === KEY.DOWN && sheet.type === 'apps') sheet.sel = Math.min(n - 1, sheet.sel + cols);
+    else if (k === KEY.ENTER) {
+      if (sheet.type === 'wallpaper') {
+        state.wallpaper = sheet.sel;
+        save();
+        showWallpaper();
+      } else launch(sheet.items[sheet.sel]);
+      sheet = null;
+    }
   }
 
   // ◀ ▶ walk through every app, crossing from one group to the next.
@@ -333,7 +454,17 @@
     if (k === 66) k = KEY.BLUE;
     if (k === 82) k = KEY.RED;
     var handled = true;
-    if (editing && moving) {
+    if (sheet) {
+      sheetKey(k);
+    } else if (zone === 'top' && !editing) {
+      if (k === KEY.LEFT) topIndex = Math.max(0, topIndex - 1);
+      else if (k === KEY.RIGHT) topIndex = Math.min(TOP_BUTTONS.length - 1, topIndex + 1);
+      else if (k === KEY.DOWN || k === KEY.BACK) zone = 'dock';
+      else if (k === KEY.ENTER) openSheet(TOP_BUTTONS[topIndex].id);
+      else if (k === KEY.BLUE) nextWallpaper();
+      else if (k === KEY.YELLOW) { zone = 'dock'; toggleEditing(); return e.preventDefault(); }
+      else handled = false;
+    } else if (editing && moving) {
       if (k === KEY.LEFT) moveApp(-1);
       else if (k === KEY.RIGHT) moveApp(1);
       else if (k === KEY.ENTER || k === KEY.BACK || k === KEY.YELLOW) moving = false;
@@ -346,6 +477,7 @@
       switch (k) {
         case KEY.LEFT: step(-1); break;
         case KEY.RIGHT: step(1); break;
+        case KEY.UP: if (!editing) zone = 'top'; break;
         case KEY.ENTER: {
           if (editing) { openMenu(); break; }
           var app = visibleApps(focus.row)[focus.col];

@@ -41,7 +41,8 @@ cette date pourrait être refusée.
 | --- | --- |
 | Flèches / OK | Naviguer / ouvrir l'appli |
 | Jaune | Réorganiser : OK sur une tuile pour la déplacer, la masquer ou la réafficher |
-| Bleu | Changer de photo de fond |
+| Haut | Boutons Fond d'écran, Toutes les applis et Réglages |
+| Bleu | Photo de fond suivante |
 | Rouge | Diagnostic |
 
 ## Modifier les applis
