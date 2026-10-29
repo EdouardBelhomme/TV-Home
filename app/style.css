@@ -128,3 +128,19 @@ body:not(.editing) .tile.hidden-app { display: none; }
   pointer-events: none;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Diagnostics panel (red button) */
+.diag {
+  display: none;
+  position: fixed; top: 60px; right: 60px; bottom: 60px;
+  width: 900px;
+  padding: 28px 32px;
+  border-radius: 20px;
+  background: rgba(8, 8, 12, 0.94);
+  color: #d7f5d0;
+  font: 20px/1.45 Consolas, "DejaVu Sans Mono", monospace;
+  white-space: pre-wrap;
+  overflow: hidden;
+  z-index: 10;
+}
+.diag.show { display: block; }

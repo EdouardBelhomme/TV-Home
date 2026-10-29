@@ -1,6 +1,6 @@
 {
   "name": "tv-home",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Écran d'accueil épuré pour TV Samsung (module TizenBrew) : heure, fond animé et tuiles d'applis.",
   "packageType": "app",
   "appName": "Accueil",

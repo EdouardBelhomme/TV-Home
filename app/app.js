@@ -96,7 +96,7 @@
     document.body.classList.toggle('editing', editing);
     document.getElementById('hints').innerHTML = editing
       ? '<span>◀ ▶ Déplacer</span><span>OK Masquer / afficher</span><span><i class="dot yellow"></i>Terminer</span>'
-      : '<span><i class="dot yellow"></i>Réorganiser</span><span><i class="dot blue"></i>Changer d\'ambiance</span>';
+      : '<span><i class="dot red"></i>Diagnostic</span><span><i class="dot yellow"></i>Réorganiser</span><span><i class="dot blue"></i>Changer d\'ambiance</span>';
   }
 
   function clampFocus() {
@@ -147,15 +147,96 @@
   }
 
   // ---------- Launching ----------
+  // ---------- Diagnostics (red button) ----------
+  var logLines = [];
+  function log(msg) {
+    var d = new Date();
+    logLines.push(pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + '  ' + msg);
+    if (logLines.length > 40) logLines.shift();
+    var panel = document.getElementById('diag');
+    if (panel.classList.contains('show')) panel.textContent = logLines.join('\n');
+  }
+  function toggleDiag() {
+    var panel = document.getElementById('diag');
+    panel.textContent = logLines.join('\n');
+    panel.classList.toggle('show');
+  }
+
+  // Installed apps as the Tizen runtime knows them (null when the tizen API is not exposed to this page).
+  var tizenApps = null;
+  function loadTizenApps() {
+    var api = window.tizen && window.tizen.application;
+    log('page: ' + location.href);
+    log('tizen API: ' + (api ? 'disponible' : 'absente'));
+    if (!api) return;
+    try {
+      api.getAppsInfo(function (list) {
+        tizenApps = list;
+        log('getAppsInfo: ' + list.length + ' applis');
+        window.HOME_SHELVES.forEach(function (s) {
+          s.apps.forEach(function (a) { if (a.id) { var info = findTizenApp(a); log('  ' + a.name + ' -> ' + (info ? info.id : '?')); } });
+        });
+      }, function (err) { log('getAppsInfo erreur: ' + err.name + ' ' + err.message); });
+    } catch (e) { log('getAppsInfo exception: ' + e.message); }
+  }
+  function findTizenApp(app) {
+    if (!tizenApps) return null;
+    var name = app.name.toLowerCase();
+    return tizenApps.filter(function (i) { return i.id === app.id || i.packageId === app.id || i.id.indexOf(app.id + '.') === 0; })[0]
+      || tizenApps.filter(function (i) { return (i.name || '').toLowerCase().indexOf(name) === 0; })[0]
+      || null;
+  }
+
+  // ---------- Launching ----------
+  // Tries, in order: the Tizen application API, the TV's remote-control WebSocket, then its REST API.
   function launch(app) {
     if (app.module) return launchModule(app);
     toast('Ouverture de ' + app.name + '…');
-    // The TV's local API opens any installed app by its Samsung id; no-cors keeps it a simple request.
-    fetch(TV_API + app.id, { method: 'POST', mode: 'no-cors' }).catch(function () {
-      try {
-        window.tizen.application.launch(app.id, null, function () { toast(app.name + ' introuvable'); });
-      } catch (e) { toast('Impossible d\'ouvrir ' + app.name); }
+    log('lancement ' + app.name + ' (' + app.id + ')');
+    launchWithTizen(app, function () {
+      launchWithRemoteSocket(app, function () { launchWithRest(app); });
     });
+  }
+
+  function launchWithTizen(app, fallback) {
+    var api = window.tizen && window.tizen.application;
+    if (!api) { log('  tizen: API absente'); return fallback(); }
+    var info = findTizenApp(app);
+    var target = info ? info.id : app.id;
+    try {
+      api.launch(target, function () { log('  tizen: OK ' + target); }, function (err) {
+        log('  tizen: ' + target + ' -> ' + err.name + ' ' + err.message);
+        fallback();
+      });
+    } catch (e) { log('  tizen exception: ' + e.message); fallback(); }
+  }
+
+  function launchWithRemoteSocket(app, fallback) {
+    var name = btoa('Accueil TV');
+    var ws, done = false;
+    function fail(why) { if (done) return; done = true; log('  socket: ' + why); try { ws.close(); } catch (e) { /* ignore */ } fallback(); }
+    try { ws = new WebSocket('ws://127.0.0.1:8001/api/v2/channels/samsung.remote.control?name=' + name); } catch (e) { return fail('exception ' + e.message); }
+    var timer = setTimeout(function () { fail('pas de reponse (autorisation ?)'); }, 6000);
+    ws.onmessage = function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      log('  socket: ' + msg.event);
+      if (msg.event === 'ms.channel.connect' && !done) {
+        done = true;
+        clearTimeout(timer);
+        ws.send(JSON.stringify({ method: 'ms.channel.emit', params: { event: 'ed.apps.launch', to: 'host', data: { appId: app.id, action_type: 'DEEP_LINK' } } }));
+        setTimeout(function () { try { ws.close(); } catch (e) { /* ignore */ } }, 1500);
+      } else if (msg.event === 'ms.channel.unauthorized') { clearTimeout(timer); fail('refuse'); }
+    };
+    ws.onerror = function () { clearTimeout(timer); fail('erreur de connexion'); };
+  }
+
+  function launchWithRest(app) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', TV_API + app.id);
+    xhr.onload = function () { log('  rest: HTTP ' + xhr.status + ' ' + xhr.responseText); };
+    xhr.onerror = function () { log('  rest: erreur reseau'); toast('Impossible d\'ouvrir ' + app.name + ' (bouton rouge : détails)'); };
+    try { xhr.send(); } catch (e) { log('  rest exception: ' + e.message); }
   }
 
   // Asks TizenBrew's local service for its modules, then launches the matching one the same way TizenBrew's own UI does.
@@ -214,6 +295,7 @@
     var k = e.keyCode;
     if (k === 89) k = KEY.YELLOW; // "y" and "b" for testing in a desktop browser
     if (k === 66) k = KEY.BLUE;
+    if (k === 82) k = KEY.RED;
     var handled = true;
     switch (k) {
       case KEY.LEFT: editing ? moveTile(-1) : focus.col--; break;
@@ -231,6 +313,7 @@
       }
       case KEY.YELLOW: toggleEditing(); return e.preventDefault();
       case KEY.BLUE: nextMood(); break;
+      case KEY.RED: toggleDiag(); return e.preventDefault();
       case KEY.BACK: if (editing) { toggleEditing(); return e.preventDefault(); } handled = false; break;
       default: handled = false;
     }
@@ -245,6 +328,7 @@
   } catch (e) { /* not running on a TV */ }
 
   document.addEventListener('keydown', onKey);
+  loadTizenApps();
   applyMood();
   tick();
   setInterval(tick, 1000);
