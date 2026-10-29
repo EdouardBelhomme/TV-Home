@@ -7,28 +7,18 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="sky" aria-hidden="true">
-    <div class="blob b1"></div>
-    <div class="blob b2"></div>
-    <div class="blob b3"></div>
-    <div class="grain"></div>
-  </div>
+  <div class="wall" id="wallA"></div>
+  <div class="wall" id="wallB"></div>
+  <div class="shade"></div>
 
-  <main class="home">
-    <header class="hero">
-      <p class="greeting" id="greeting">Bonsoir</p>
-      <h1 class="clock" id="clock">--:--</h1>
-      <p class="date" id="date"></p>
-    </header>
+  <header class="clock-block">
+    <div class="clock" id="clock">--:--</div>
+    <div class="date" id="date"></div>
+  </header>
 
-    <section class="shelf" id="shelves"></section>
-  </main>
+  <nav class="dock" id="dock"></nav>
 
-  <footer class="hints" id="hints">
-    <span><i class="dot yellow"></i>Réorganiser</span>
-    <span><i class="dot blue"></i>Changer d'ambiance</span>
-  </footer>
-
+  <footer class="hints" id="hints"></footer>
   <div class="toast" id="toast" role="status"></div>
   <pre class="diag" id="diag"></pre>
 

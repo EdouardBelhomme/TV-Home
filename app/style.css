@@ -1,14 +1,13 @@
-/* Tuned for a 1920x1080 TV viewport on Tizen 5.5 (Chromium 69): no backdrop-filter, no optional chaining. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&display=swap");
+
+/* Tuned for a 1920x1080 TV viewport on Tizen 5.5 (Chromium 69):
+   no backdrop-filter, no flex gap, no `inset`. Only opacity and background animate. */
 :root {
-  --bg: #07080d;
-  --text: #f4f1ea;
-  --muted: rgba(244, 241, 234, 0.62);
-  --c1: #3b2a7a;
-  --c2: #0f5c7a;
-  --c3: #7a2a4f;
-  --tile-w: 300px;
-  --tile-h: 170px;
-  --gap: 28px;
+  --text: #f7f5f0;
+  --muted: rgba(247, 245, 240, 0.62);
+  --panel: rgba(18, 20, 24, 0.46);
+  --panel-line: rgba(255, 255, 255, 0.09);
+  --focus: rgba(255, 255, 255, 0.17);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,119 +16,111 @@ html, body {
   width: 1920px;
   height: 1080px;
   overflow: hidden;
-  background: var(--bg);
+  background: #101214;
   color: var(--text);
-  font-family: "SamsungOne", "Samsung Sharp Sans", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Manrope", "SamsungOne", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- Animated sky ---------- */
-.sky { position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: var(--bg); transition: background 2s; }
-.blob {
-  position: absolute;
-  width: 1400px;
-  height: 1400px;
-  border-radius: 50%;
-  opacity: 0.85;
-  will-change: transform;
-  transition: background 2s;
+/* ---------- Wallpaper (two layers for a cross-fade) ---------- */
+.wall {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  background: #101214 center / cover no-repeat;
+  opacity: 0;
+  transition: opacity 0.9s ease;
 }
-.b1 { background: radial-gradient(circle at center, var(--c1) 0%, transparent 62%); top: -500px; left: -300px; animation: drift1 38s ease-in-out infinite alternate; }
-.b2 { background: radial-gradient(circle at center, var(--c2) 0%, transparent 62%); top: 100px; right: -500px; animation: drift2 46s ease-in-out infinite alternate; }
-.b3 { background: radial-gradient(circle at center, var(--c3) 0%, transparent 62%); bottom: -800px; left: 400px; animation: drift3 54s ease-in-out infinite alternate; }
-@keyframes drift1 { to { transform: translate(380px, 220px) scale(1.15); } }
-@keyframes drift2 { to { transform: translate(-420px, 160px) scale(0.9); } }
-@keyframes drift3 { to { transform: translate(-260px, -240px) scale(1.2); } }
-.grain {
-  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
-  background: linear-gradient(180deg, rgba(7, 8, 13, 0) 40%, rgba(7, 8, 13, 0.75) 100%);
+.wall.show { opacity: 1; }
+.shade {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0) 26%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0) 38%);
 }
 
-/* ---------- Layout ---------- */
-.home { position: relative; height: 100%; padding: 110px 120px 0; display: flex; flex-direction: column; }
+/* ---------- Clock ---------- */
+.clock-block { position: fixed; top: 84px; left: 120px; }
+.clock { font-size: 76px; font-weight: 500; letter-spacing: -0.01em; line-height: 1; font-variant-numeric: tabular-nums; }
+.date { margin-top: 14px; font-size: 26px; font-weight: 500; color: var(--muted); }
 
-.hero { margin-bottom: auto; }
-.greeting { font-size: 34px; letter-spacing: 0.02em; color: var(--muted); }
-.clock {
-  font-size: 220px;
-  font-weight: 200;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  margin: 6px 0 10px -8px;
-  font-variant-numeric: tabular-nums;
-}
-.date { font-size: 40px; font-weight: 300; }
-
-.shelf { padding-bottom: 120px; }
-.row { margin-top: 44px; }
-.row-title { font-size: 26px; font-weight: 500; color: var(--muted); margin-bottom: 18px; letter-spacing: 0.04em; text-transform: uppercase; }
-.tiles { display: flex; transition: transform 0.25s ease-out; }
-.tiles .tile + .tile { margin-left: var(--gap); }
-
-/* ---------- Tiles ---------- */
-.tile {
-  position: relative;
-  flex: 0 0 var(--tile-w);
-  height: var(--tile-h);
-  border-radius: 22px;
-  overflow: hidden;
-  background: var(--tile-color);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, opacity 0.2s;
-}
-.tile::after {
-  content: "";
-  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.25) 100%);
-}
-.tile .mark {
-  position: absolute; top: 18px; left: 24px;
-  font-size: 54px; font-weight: 700; line-height: 1;
-  color: rgba(255, 255, 255, 0.92);
-}
-.tile .label { position: absolute; left: 24px; bottom: 18px; right: 24px; }
-.tile .name { font-size: 30px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tile .sub { font-size: 20px; opacity: 0.8; }
-
-.tile.focused {
-  transform: scale(1.1);
-  box-shadow: 0 0 0 5px #fff, 0 24px 60px rgba(0, 0, 0, 0.55);
-  z-index: 2;
-}
-
-/* Edit mode */
-body.editing .tile { animation: wiggle 0.5s ease-in-out infinite alternate; }
-body.editing .tile.focused { animation: none; box-shadow: 0 0 0 5px #ffd23f, 0 24px 60px rgba(0, 0, 0, 0.55); }
-body.editing .tile.hidden-app { opacity: 0.5; }
-body:not(.editing) .tile.hidden-app { display: none; }
-@keyframes wiggle { from { transform: rotate(-0.6deg); } to { transform: rotate(0.6deg); } }
-
-/* ---------- Footer & toast ---------- */
-.hints {
-  position: fixed; right: 120px; bottom: 44px;
+/* ---------- Dock ---------- */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 100px;
+  width: max-content;
+  margin: 0 auto;
+  height: 232px;
+  padding: 18px;
   display: flex;
-  font-size: 22px; color: var(--muted);
+  border-radius: 40px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
 }
-.hints span + span { margin-left: 40px; }
-.dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 10px; vertical-align: -2px; }
-.dot.red { background: #e74c3c; }
-.dot.yellow { background: #f1c40f; }
-.dot.blue { background: #3498db; }
+.group { position: relative; display: flex; }
+.group + .group { margin-left: 22px; padding-left: 22px; border-left: 1px solid var(--panel-line); }
+.group-title {
+  position: absolute; left: 14px; top: -64px;
+  font-size: 22px; font-weight: 600; letter-spacing: 0.02em;
+  color: rgba(247, 245, 240, 0.82);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
+}
+.group + .group .group-title { left: 36px; }
+
+.item {
+  position: relative;
+  width: 178px;
+  height: 196px;
+  border-radius: 28px;
+  padding-top: 34px;
+  display: flex; flex-direction: column; align-items: center;
+  opacity: 0.8;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+.item.focused { background: var(--focus); opacity: 1; }
+.logo { height: 64px; display: flex; align-items: center; justify-content: center; }
+.logo img { height: 60px; max-width: 128px; }
+.logo .wordmark { font-size: 34px; font-weight: 600; letter-spacing: 0.02em; }
+.name { margin-top: 20px; font-size: 27px; font-weight: 500; white-space: nowrap; }
+.sub { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 17px; font-weight: 500; color: var(--muted); }
+
+/* ---------- Edit mode ---------- */
+body.editing .item.hidden-app { opacity: 0.32; }
+body:not(.editing) .item.hidden-app { display: none; }
+.item.moving { background: rgba(255, 255, 255, 0.26); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85); }
+.badge { position: absolute; top: 12px; font-size: 16px; font-weight: 600; color: var(--muted); }
+.menu {
+  position: absolute; left: 50%; bottom: 100%;
+  margin-bottom: 24px;
+  width: 230px;
+  transform: translateX(-50%);
+  padding: 10px;
+  border-radius: 22px;
+  background: rgba(18, 20, 24, 0.9);
+  border: 1px solid var(--panel-line);
+  z-index: 3;
+}
+.menu .opt { padding: 12px 18px; border-radius: 14px; font-size: 24px; font-weight: 500; color: var(--muted); }
+.menu .opt.sel { background: var(--focus); color: var(--text); }
+
+/* ---------- Hints, toast, diagnostics ---------- */
+.hints { position: fixed; right: 120px; top: 96px; font-size: 20px; font-weight: 500; color: var(--muted); text-align: right; }
+.hints span { display: block; margin-bottom: 10px; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 10px; vertical-align: 1px; }
+.dot.red { background: #e5534b; }
+.dot.yellow { background: #e3b341; }
+.dot.blue { background: #4a90e2; }
 
 .toast {
-  position: fixed; left: 50%; bottom: 120px;
-  transform: translate(-50%, 30px);
-  padding: 18px 34px;
-  border-radius: 40px;
-  background: rgba(20, 20, 28, 0.92);
-  font-size: 26px;
+  position: fixed; left: 50%; top: 92px;
+  transform: translateX(-50%);
+  padding: 14px 28px;
+  border-radius: 30px;
+  background: rgba(18, 20, 24, 0.82);
+  font-size: 22px; font-weight: 500;
   opacity: 0;
-  transition: opacity 0.25s, transform 0.25s;
+  transition: opacity 0.25s;
   pointer-events: none;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; }
 
-/* Diagnostics panel (red button) */
 .diag {
   display: none;
   position: fixed; top: 60px; right: 60px; bottom: 60px;
@@ -144,20 +135,3 @@ body:not(.editing) .tile.hidden-app { display: none; }
   z-index: 10;
 }
 .diag.show { display: block; }
-
-/* Edit mode: tile menu, moving state, hidden badge */
-body.editing .tile.moving { animation: none; transform: scale(1.14) translateY(-12px); box-shadow: 0 0 0 5px #ffd23f, 0 30px 70px rgba(0, 0, 0, 0.6); }
-.badge {
-  position: absolute; top: 16px; right: 16px; z-index: 1;
-  padding: 4px 12px; border-radius: 14px;
-  background: rgba(0, 0, 0, 0.6);
-  font-size: 18px;
-}
-.tile-menu {
-  position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 3;
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 10px 18px;
-  background: rgba(10, 10, 16, 0.92);
-}
-.tile-menu .item { font-size: 26px; padding: 6px 14px; border-radius: 12px; color: var(--muted); }
-.tile-menu .item.sel { background: #fff; color: #111; }

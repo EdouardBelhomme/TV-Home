@@ -10,6 +10,7 @@ trap 'rm -rf "$build"' EXIT
 cp wgt/config.xml wgt/index.html "$build/"
 mkdir -p "$build/app"
 cp app/index.html app/style.css app/apps.js app/app.js "$build/app/"
+cp -r app/assets "$build/app/"
 python3 -I tools/make_icon.py "$build/icon.png"
 
 mkdir -p dist

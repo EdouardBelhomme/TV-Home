@@ -3,35 +3,27 @@
   'use strict';
 
   var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13, BACK: 10009, RED: 403, GREEN: 404, YELLOW: 405, BLUE: 406 };
-  var STORE_KEY = 'tv-home:v1';
+  var STORE_KEY = 'tv-home:v2';
   var TV_API = 'http://127.0.0.1:8001/api/v2/applications/';
   var TIZENBREW_WS = 'ws://127.0.0.1:8081';
   var TIZENBREW_APP_ID = 'xvvl3S1bvH.TizenBrewStandalone';
 
+  // Images and logos: from jsDelivr when the installed app loaded the code from GitHub (raw.githubusercontent
+  // serves SVG as text/plain), from the bundled copy when offline, relative otherwise (browser, TizenBrew).
+  var ASSETS = (window.TV_HOME_SOURCE === 'github' ? 'https://cdn.jsdelivr.net/gh/EdouardBelhomme/TV-Home@main/app/'
+    : window.TV_HOME_SOURCE === 'local' ? 'app/' : '') + 'assets/';
+  var WALLPAPERS = ['misty', 'cove', 'forest', 'valley', 'night', 'peaks'];
+
   var DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   var MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-
-  // Colour sets for the animated background. "auto" picks one from the time of day.
-  var MOODS = {
-    aube: ['#5b3a8c', '#c0567a', '#e39b5a'],
-    jour: ['#1f5f99', '#2a9d8f', '#6a7fd1'],
-    soir: ['#3b2a7a', '#0f5c7a', '#7a2a4f'],
-    nuit: ['#151a3d', '#0b3a4a', '#2b1640'],
-    foret: ['#1e4d3a', '#3d6b2f', '#0f3b44'],
-    braise: ['#7a1f1f', '#a8521c', '#3a1430']
-  };
-  var MOOD_ORDER = ['auto', 'aube', 'jour', 'soir', 'nuit', 'foret', 'braise'];
+  var MENU_LABELS = { move: 'Déplacer', hide: 'Masquer', show: 'Afficher', cancel: 'Annuler' };
 
   var state = load();
   var editing = false;
-  var menu = null;     // edit-mode tile menu: { sel, options }
-  var moving = false;  // edit mode: the focused tile follows ◀ ▶
-  var MENU_LABELS = { move: 'Déplacer', hide: 'Masquer', show: 'Afficher', cancel: 'Annuler' };
-  var focus = { row: 0, col: 0 };
+  var menu = null;     // edit-mode menu: { sel, options }
+  var moving = false;  // edit mode: the focused app follows ◀ ▶
+  var focus = { row: 0, col: 0 }; // row = group in HOME_SHELVES
   var shelves = buildShelves();
-  var TILE_STEP = 300 + 28; // --tile-w + --gap
-  var TILES_PER_SCREEN = 5;
-  var rowOffset = shelves.map(function () { return 0; });
 
   // ---------- Persistence (localStorage can be unavailable) ----------
   function load() {
@@ -39,7 +31,7 @@
       var raw = window.localStorage.getItem(STORE_KEY);
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
-    return { order: {}, hidden: {}, mood: 'auto' };
+    return { order: {}, hidden: {}, wallpaper: 0 };
   }
   function save() {
     try { window.localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
@@ -65,108 +57,110 @@
     return shelves[r].apps.filter(function (a) { return editing || !state.hidden[appKey(a)]; });
   }
 
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  }
+
+  function renderItem(app, isFocused) {
+    var item = el('div', 'item' + (isFocused ? ' focused' : '') + (state.hidden[appKey(app)] ? ' hidden-app' : '') + (isFocused && moving ? ' moving' : ''));
+    var logo = el('div', 'logo');
+    if (app.icon) {
+      var img = document.createElement('img');
+      img.src = ASSETS + 'icons/' + app.icon;
+      img.alt = '';
+      logo.appendChild(img);
+    } else {
+      logo.appendChild(el('span', 'wordmark', app.mark || app.name));
+    }
+    item.appendChild(logo);
+    item.appendChild(el('div', 'name', app.name));
+    if (app.sub) item.appendChild(el('div', 'sub', app.sub));
+    if (state.hidden[appKey(app)]) item.appendChild(el('div', 'badge', 'Masquée'));
+    if (isFocused && menu) {
+      var m = el('div', 'menu');
+      menu.options.forEach(function (opt, i) { m.appendChild(el('div', 'opt' + (i === menu.sel ? ' sel' : ''), MENU_LABELS[opt])); });
+      item.appendChild(m);
+    }
+    return item;
+  }
+
   function render() {
-    var host = document.getElementById('shelves');
-    host.innerHTML = '';
+    var dock = document.getElementById('dock');
+    dock.innerHTML = '';
     shelves.forEach(function (shelf, r) {
-      var row = document.createElement('div');
-      row.className = 'row';
-      var title = document.createElement('h2');
-      title.className = 'row-title';
-      title.textContent = shelf.title;
-      var tiles = document.createElement('div');
-      tiles.className = 'tiles';
-      // Scroll the row so the focused tile stays on screen.
-      if (r === focus.row) {
-        if (focus.col < rowOffset[r]) rowOffset[r] = focus.col;
-        if (focus.col > rowOffset[r] + TILES_PER_SCREEN - 1) rowOffset[r] = focus.col - TILES_PER_SCREEN + 1;
-      }
-      rowOffset[r] = Math.max(0, Math.min(rowOffset[r], visibleApps(r).length - TILES_PER_SCREEN));
-      tiles.style.transform = 'translateX(' + (-rowOffset[r] * TILE_STEP) + 'px)';
-      visibleApps(r).forEach(function (app, c) {
-        var t = document.createElement('div');
-        t.className = 'tile' + (state.hidden[appKey(app)] ? ' hidden-app' : '') + (r === focus.row && c === focus.col ? ' focused' : '');
-        t.style.setProperty('--tile-color', app.color);
-        t.innerHTML = '<div class="mark"></div><div class="label"><div class="name"></div>' + (app.sub ? '<div class="sub"></div>' : '') + '</div>';
-        t.querySelector('.mark').textContent = app.mark;
-        t.querySelector('.name').textContent = app.name;
-        if (app.sub) t.querySelector('.sub').textContent = app.sub;
-        if (state.hidden[appKey(app)]) t.insertAdjacentHTML('beforeend', '<div class="badge">Masquée</div>');
-        var isFocused = r === focus.row && c === focus.col;
-        if (isFocused && moving) t.classList.add('moving');
-        if (isFocused && menu) {
-          var m = document.createElement('div');
-          m.className = 'tile-menu';
-          menu.options.forEach(function (opt, i) {
-            var item = document.createElement('div');
-            item.className = 'item' + (i === menu.sel ? ' sel' : '');
-            item.textContent = MENU_LABELS[opt];
-            m.appendChild(item);
-          });
-          t.appendChild(m);
-        }
-        tiles.appendChild(t);
-      });
-      row.appendChild(title);
-      row.appendChild(tiles);
-      host.appendChild(row);
+      var apps = visibleApps(r);
+      if (!apps.length) return;
+      var group = el('div', 'group');
+      group.appendChild(el('div', 'group-title', shelf.title));
+      apps.forEach(function (app, c) { group.appendChild(renderItem(app, r === focus.row && c === focus.col)); });
+      dock.appendChild(group);
     });
     document.body.classList.toggle('editing', editing);
     document.getElementById('hints').innerHTML = editing
-      ? (moving
-        ? '<span>◀ ▶ Déplacer la tuile</span><span>OK Poser</span>'
-        : '<span>OK Options de la tuile</span><span>Retour ou <i class="dot yellow"></i>Terminer</span>')
-      : '<span><i class="dot red"></i>Diagnostic</span><span><i class="dot yellow"></i>Réorganiser</span><span><i class="dot blue"></i>Changer d\'ambiance</span>';
+      ? (moving ? '<span>◀ ▶ Déplacer</span><span>OK Poser</span>' : '<span>OK Options</span><span>Retour Terminer</span>')
+      : '<span>Fond d\'écran<i class="dot blue"></i></span><span>Réorganiser<i class="dot yellow"></i></span>';
   }
 
+  // ◀ ▶ walk through every app, crossing from one group to the next.
+  function step(dir) {
+    var r = focus.row, c = focus.col + dir;
+    while (r >= 0 && r < shelves.length) {
+      var n = visibleApps(r).length;
+      if (c >= 0 && c < n) { focus.row = r; focus.col = c; return; }
+      r += dir;
+      if (r < 0 || r >= shelves.length) return;
+      c = dir > 0 ? 0 : visibleApps(r).length - 1;
+    }
+  }
   function clampFocus() {
-    if (focus.row < 0) focus.row = 0;
     if (focus.row >= shelves.length) focus.row = shelves.length - 1;
     var n = visibleApps(focus.row).length;
+    if (!n) { focus.col = 0; step(1); return; }
     if (focus.col >= n) focus.col = n - 1;
     if (focus.col < 0) focus.col = 0;
   }
 
-  // ---------- Clock & ambiance ----------
+  // ---------- Clock & wallpaper ----------
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function tick() {
     var d = new Date();
-    var h = d.getHours();
-    document.getElementById('clock').textContent = pad(h) + ':' + pad(d.getMinutes());
+    document.getElementById('clock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
     var day = DAYS[d.getDay()];
     document.getElementById('date').textContent = day.charAt(0).toUpperCase() + day.slice(1) + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
-    document.getElementById('greeting').textContent = h < 5 ? 'Bonne nuit' : h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir';
-    if (state.mood === 'auto') applyMood();
   }
-  function autoMood() {
-    var h = new Date().getHours();
-    return h < 6 ? 'nuit' : h < 10 ? 'aube' : h < 17 ? 'jour' : h < 22 ? 'soir' : 'nuit';
+
+  var wallFront = 'wallA';
+  function showWallpaper() {
+    var name = WALLPAPERS[state.wallpaper % WALLPAPERS.length];
+    var back = wallFront === 'wallA' ? 'wallB' : 'wallA';
+    var img = new Image();
+    img.onload = function () {
+      var b = document.getElementById(back);
+      b.style.backgroundImage = 'url("' + img.src + '")';
+      b.classList.add('show');
+      document.getElementById(wallFront).classList.remove('show');
+      wallFront = back;
+    };
+    img.src = ASSETS + 'wallpapers/' + name + '.jpg';
   }
-  function applyMood() {
-    var colors = MOODS[state.mood === 'auto' ? autoMood() : state.mood];
-    var root = document.documentElement.style;
-    root.setProperty('--c1', colors[0]);
-    root.setProperty('--c2', colors[1]);
-    root.setProperty('--c3', colors[2]);
-  }
-  function nextMood() {
-    var i = MOOD_ORDER.indexOf(state.mood);
-    state.mood = MOOD_ORDER[(i + 1) % MOOD_ORDER.length];
+  function nextWallpaper() {
+    state.wallpaper = (state.wallpaper + 1) % WALLPAPERS.length;
     save();
-    applyMood();
-    toast('Ambiance : ' + (state.mood === 'auto' ? 'automatique' : state.mood));
+    showWallpaper();
   }
 
   var toastTimer;
   function toast(msg) {
-    var el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.add('show');
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2200);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
   }
 
-  // ---------- Launching ----------
   // ---------- Diagnostics (red button) ----------
   var logLines = [];
   function log(msg) {
@@ -255,14 +249,14 @@
     var xhr = new XMLHttpRequest();
     xhr.open('POST', TV_API + app.id);
     xhr.onload = function () { log('  rest: HTTP ' + xhr.status + ' ' + xhr.responseText); };
-    xhr.onerror = function () { log('  rest: erreur reseau'); toast('Impossible d\'ouvrir ' + app.name + ' (bouton rouge : détails)'); };
+    xhr.onerror = function () { log('  rest: erreur reseau'); toast('Impossible d\'ouvrir ' + app.name); };
     try { xhr.send(); } catch (e) { log('  rest exception: ' + e.message); }
   }
 
   // Inside TizenBrew: asks its local service for the module and launches it the way TizenBrew's own UI does.
   // In the installed app: opens TizenBrew itself (set TizenTube as its auto-launch module to land on YouTube).
   function launchModule(app) {
-    toast('Ouverture de ' + app.name + ' ' + (app.sub || '') + '…');
+    toast('Ouverture de ' + app.name + '…');
     if (location.port !== '8081') {
       log('lancement TizenBrew (' + TIZENBREW_APP_ID + ')');
       return launchWithTizen({ name: 'TizenBrew', id: TIZENBREW_APP_ID }, function () { toast('TizenBrew introuvable'); });
@@ -290,8 +284,8 @@
   }
 
   // ---------- Editing ----------
-  // In edit mode the arrows move the focus; OK opens a small menu on the tile (move / hide / cancel).
-  // While moving, ◀ ▶ carry the tile and OK or Back drops it.
+  // In edit mode the arrows move the focus; OK opens a small menu (move / hide or show / cancel).
+  // While moving, ◀ ▶ carry the app within its group and OK or Back drops it.
   function openMenu() {
     var app = visibleApps(focus.row)[focus.col];
     if (!app) return;
@@ -305,7 +299,7 @@
     else if (choice === 'hide') state.hidden[appKey(app)] = true;
     else if (choice === 'show') delete state.hidden[appKey(app)];
   }
-  function moveTile(dir) {
+  function moveApp(dir) {
     var apps = shelves[focus.row].apps; // editing shows every app, so visible index == array index
     var to = focus.col + dir;
     if (to < 0 || to >= apps.length) return;
@@ -335,13 +329,13 @@
   // ---------- Input ----------
   function onKey(e) {
     var k = e.keyCode;
-    if (k === 89) k = KEY.YELLOW; // "y" and "b" for testing in a desktop browser
+    if (k === 89) k = KEY.YELLOW; // "y", "b" and "r" for testing in a desktop browser
     if (k === 66) k = KEY.BLUE;
     if (k === 82) k = KEY.RED;
     var handled = true;
     if (editing && moving) {
-      if (k === KEY.LEFT) moveTile(-1);
-      else if (k === KEY.RIGHT) moveTile(1);
+      if (k === KEY.LEFT) moveApp(-1);
+      else if (k === KEY.RIGHT) moveApp(1);
       else if (k === KEY.ENTER || k === KEY.BACK || k === KEY.YELLOW) moving = false;
     } else if (editing && menu) {
       if (k === KEY.UP) menu.sel = Math.max(0, menu.sel - 1);
@@ -350,10 +344,8 @@
       else if (k === KEY.BACK || k === KEY.YELLOW) menu = null;
     } else {
       switch (k) {
-        case KEY.LEFT: focus.col--; break;
-        case KEY.RIGHT: focus.col++; break;
-        case KEY.UP: focus.row--; break;
-        case KEY.DOWN: focus.row++; break;
+        case KEY.LEFT: step(-1); break;
+        case KEY.RIGHT: step(1); break;
         case KEY.ENTER: {
           if (editing) { openMenu(); break; }
           var app = visibleApps(focus.row)[focus.col];
@@ -361,7 +353,7 @@
           break;
         }
         case KEY.YELLOW: toggleEditing(); return e.preventDefault();
-        case KEY.BLUE: nextMood(); break;
+        case KEY.BLUE: nextWallpaper(); break;
         case KEY.RED: toggleDiag(); return e.preventDefault();
         case KEY.BACK: if (editing) { toggleEditing(); return e.preventDefault(); } handled = false; break;
         default: handled = false;
@@ -379,8 +371,9 @@
 
   document.addEventListener('keydown', onKey);
   loadTizenApps();
-  applyMood();
+  showWallpaper();
   tick();
   setInterval(tick, 1000);
+  clampFocus();
   render();
 })();
